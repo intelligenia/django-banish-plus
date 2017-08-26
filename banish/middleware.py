@@ -17,9 +17,10 @@ import sys
 
 import django
 from django.conf import settings
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, HttpResponseRedirect, HttpResponse
 from django.core.exceptions import MiddlewareNotUsed
 from django.core.cache import cache
+from django.template import loader
 
 from models import Banishment, Whitelist
 
@@ -37,7 +38,14 @@ class BanishMiddleware(object):
         self.ABUSE_THRESHOLD = getattr(settings, 'BANISH_ABUSE_THRESHOLD', 75)
         self.USE_HTTP_X_FORWARDED_FOR = getattr(settings, 'BANISH_USE_HTTP_X_FORWARDED_FOR', False)
         self.BANISH_EMPTY_UA = getattr(settings, 'BANISH_EMPTY_UA', True)
-        self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', 'You are banned.')
+        self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', None)
+        self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
+        self.BANISH_URI_FILTER = getattr(settings, 'BANISH_URI_FILTER', "/")
+
+        self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
+        self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
+
+
 
         if not self.ENABLED:
             raise MiddlewareNotUsed(
@@ -73,25 +81,41 @@ class BanishMiddleware(object):
                 cache_key = self.WHITELIST_PREFIX + whitelist.condition
                 cache.set(cache_key, "1")
 
+    def _get_path(self, request):
+        return request.path
+
     def _get_ip(self, request):
+
         ip = request.META['REMOTE_ADDR']
         if self.USE_HTTP_X_FORWARDED_FOR or not ip or ip == '127.0.0.1':
             ip = request.META.get('HTTP_X_FORWARDED_FOR', ip).split(',')[0].strip()
         return ip
 
     def process_request(self, request):
-        ip = self._get_ip(request)
 
-        user_agent = request.META.get('HTTP_USER_AGENT', None)
+        if self.BANISH_RESTRICT_FILTER:
+            if self._get_path(request).find(self.BANISH_URI_FILTER) >= 0:
 
-        if self.DEBUG:
-            print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
+                ip = self._get_ip(request)
+                user_agent = request.META.get('HTTP_USER_AGENT', None)
 
-        # Check whitelist first, if not allowed, then check ban conditions
-        if self.is_whitelisted(ip):
-          return None
-        elif self.is_banned(ip) or self.monitor_abuse(ip) or user_agent in self.BANNED_AGENTS:
-            return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+                if self.DEBUG:
+                    print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
+
+                # Check whitelist first, if not allowed, then check ban conditions
+                if self.is_whitelisted(ip):
+                  return None
+                elif self.is_banned(ip) or \
+                     self.monitor_abuse(ip) or \
+                     user_agent in self.BANNED_AGENTS:
+
+                    if self.BANISH_MESSAGE:
+                        return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+                    elif self.BANISH_URL_REDIRECT:
+                        return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
+                    elif self.BANISH_TEMPLATRE:
+                        return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
+
 
     def http_response_forbidden(self, message, content_type):
         if django.VERSION[:2] > (1,3):
@@ -99,6 +123,14 @@ class BanishMiddleware(object):
         else:
             kwargs = {'mimetype': content_type}
         return HttpResponseForbidden(message, **kwargs)
+
+    def redirect_response_forbidden(self, url):
+        return HttpResponseRedirect(url)
+
+    def template_response_forbidden(self, request, template):
+        t = loader.get_template(template)
+        return HttpResponse(t.render({}, request))
+
 
     def is_banned(self, ip):
         # If a key BANISH MC key exists we know the user is banned.
@@ -140,6 +172,8 @@ class BanishMiddleware(object):
                 )
                 ban.save()
                 cache.set(self.BANISH_PREFIX + ip, "1")
-
-            cache.incr(cache_key)
+            try:
+                cache.incr(cache_key)
+            except ValueError:
+                pass
         return over_abuse_limit
