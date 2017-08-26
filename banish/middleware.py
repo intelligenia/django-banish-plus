@@ -38,7 +38,7 @@ class BanishMiddleware(object):
         self.ABUSE_THRESHOLD = getattr(settings, 'BANISH_ABUSE_THRESHOLD', 75)
         self.USE_HTTP_X_FORWARDED_FOR = getattr(settings, 'BANISH_USE_HTTP_X_FORWARDED_FOR', False)
         self.BANISH_EMPTY_UA = getattr(settings, 'BANISH_EMPTY_UA', True)
-        self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', None)
+        self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', "You are banned.")
         self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
         self.BANISH_URI_FILTER = getattr(settings, 'BANISH_URI_FILTER', "/")
 
@@ -109,12 +109,13 @@ class BanishMiddleware(object):
                      self.monitor_abuse(ip) or \
                      user_agent in self.BANNED_AGENTS:
 
-                    if self.BANISH_MESSAGE:
-                        return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
-                    elif self.BANISH_URL_REDIRECT:
+
+                    if self.BANISH_URL_REDIRECT:
                         return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
                     elif self.BANISH_TEMPLATRE:
                         return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
+                    else:
+                        return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
 
 
     def http_response_forbidden(self, message, content_type):
