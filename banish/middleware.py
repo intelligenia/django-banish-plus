@@ -25,6 +25,8 @@ from django.template import loader
 from models import Banishment, Whitelist
 
 
+
+
 class BanishMiddleware(object):
     def __init__(self):
         """
@@ -41,11 +43,9 @@ class BanishMiddleware(object):
         self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', "You are banned.")
         self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
         self.BANISH_URI_FILTER = getattr(settings, 'BANISH_URI_FILTER', "/")
-
         self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
         self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
-
-
+        self.BANISH_TOR_IPS = getattr(settings, 'BANISH_TOR_IPS', False)
 
         if not self.ENABLED:
             raise MiddlewareNotUsed(
@@ -91,6 +91,24 @@ class BanishMiddleware(object):
             ip = request.META.get('HTTP_X_FORWARDED_FOR', ip).split(',')[0].strip()
         return ip
 
+    def _is_tor_ip(self, ip):
+        """ Checks if ip address is a TOR exit node.
+        Relies on periodically updated IP list.
+        If IP list update has failed then gracefully assumes
+        there are no Tor exit nodes. This is so that
+        our service continues to function even if the external
+        party we are relying on goes down.
+        :param ip: IP address as a string
+        """
+        TOR_CACHE_KEY = getattr(settings, 'TOR_CACHE_KEY')
+
+        ips = cache.get(TOR_CACHE_KEY)
+
+        if not ips:
+            # Tor IP list not available; IP check not active
+            return False
+        return ip in ips
+
     def process_request(self, request):
 
         if self.BANISH_RESTRICT_FILTER:
@@ -109,13 +127,17 @@ class BanishMiddleware(object):
                      self.monitor_abuse(ip) or \
                      user_agent in self.BANNED_AGENTS:
 
-
                     if self.BANISH_URL_REDIRECT:
                         return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
                     elif self.BANISH_TEMPLATRE:
                         return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
                     else:
                         return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+
+                else:
+                    if self._is_tor_ip(ip) and self.BANISH_TOR_IPS:
+                        return self.http_response_forbidden("Banish TOR ip", content_type="text/html")
+
 
 
     def http_response_forbidden(self, message, content_type):
