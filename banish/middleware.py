@@ -46,6 +46,7 @@ class BanishMiddleware(object):
         self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
         self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
         self.BANISH_TOR_IPS = getattr(settings, 'BANISH_TOR_IPS', False)
+        self.BANISH_ONLY_WHITELIST = getattr(settings, 'BANISH_ONLY_WHITELIST', False)
 
         if not self.ENABLED:
             raise MiddlewareNotUsed(
@@ -125,6 +126,7 @@ class BanishMiddleware(object):
                   return None
                 elif self.is_banned(ip) or \
                      self.monitor_abuse(ip) or \
+                     self.BANISH_ONLY_WHITELIST or \
                      user_agent in self.BANNED_AGENTS:
 
                     if self.BANISH_URL_REDIRECT:

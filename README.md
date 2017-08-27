@@ -77,11 +77,13 @@ In your django project settings.py you must set the following options:
 
 11. ``BANISH_URI_FILTER`` is patch where banish is applied if  BANISH_RESTRICT_FILTER = True (example ``BANISH_URI_FILTER = '\api'`` only protect \api)
 
-12. Set ``BANISH_TOR_IPS = True|False`` to banish TOR request.
+12. Set ``BANISH_ONLY_WHITELIST = True|False``to allow only request from whitelist.
 
-13. Set ``TOR_IPS_DATABASE`` with tor ips database, (example, ``TOR_IPS_DATABASE = "http://torstatus.blutmagie.de/ip_list_exit.php/Tor_ip_list_EXIT.csv"``)
+13. Set ``BANISH_TOR_IPS = True|False`` to banish TOR request.
 
-14. Set ``TOR_CACHE_KEY`` with cache key. (example ``TOR_CACHE_KEY = "tor-ip-exit-list"``)
+14. Set ``TOR_IPS_DATABASE`` with tor ips database, (example, ``TOR_IPS_DATABASE = "http://torstatus.blutmagie.de/ip_list_exit.php/Tor_ip_list_EXIT.csv"``)
+
+15. Set ``TOR_CACHE_KEY`` with cache key. (example ``TOR_CACHE_KEY = "tor-ip-exit-list"``)
 
 
 License
