@@ -75,7 +75,7 @@ In your django project settings.py you must set the following options:
 
 10. Optionally set ``BANISH_RESTRICT_FILTER`` = True|False (default False), to specific url patch where banish is applied.
 
-11. ``BANISH_URI_FILTER`` is patch where banish is applied if  BANISH_RESTRICT_FILTER = True (example ```BANISH_URI_FILTER = '\api'`` only protect \api)
+11. ``BANISH_URI_FILTER`` is patch where banish is applied if  BANISH_RESTRICT_FILTER = True (example ``BANISH_URI_FILTER = '\api'`` only protect \api)
 
 12. Set ``BANISH_TOR_IPS = True|False`` to banish TOR request.
 
