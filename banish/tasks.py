@@ -5,7 +5,7 @@ from django.conf import settings
 from .models import Banishment
 
 @task()
-def clean_ip_blacklist_list():
+def clean_ip_blacklist():
     Banishment.objects.all().delete()
 
 @task()
