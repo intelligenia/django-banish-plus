@@ -28,7 +28,7 @@ Requirements:
 * **Memcache** or **Redis** cache system.
 * Celery
 
-#####Python Packages.
+##### Python Packages.
 - celery: 4.1.0
 - redis: 2.10.6
 - django-redis-cache: 1.7.1
