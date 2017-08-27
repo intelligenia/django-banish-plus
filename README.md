@@ -14,7 +14,7 @@ Features
 1. Banish requests, by **IP** or **user agent header** included blacklist.
 2. Avoid banish request by whitelist.
 3. Banish request from TOR network, using TOR IPS database.
-4. The banish actions is configurable, (403 response, redirect or custom template.)
+4. The banish action is configurable, (403 response, redirect or custom template.)
 
 
 Installation
