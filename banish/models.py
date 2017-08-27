@@ -67,8 +67,8 @@ class Banishment(models.Model):
 
     class Meta:
         permissions = (("can_ban_user", "Can Ban User"),)
-        verbose_name = "Banishment"
-        verbose_name_plural = "Banishments"
+        verbose_name = "Banishment Blacklist"
+        verbose_name_plural = "Banishments Blacklist"
         db_table = 'banishments'
 
 
@@ -99,8 +99,8 @@ class Whitelist(models.Model):
 
     class Meta:
         permissions = (("can_whitelist_user", "Can Whitelist User"),)
-        verbose_name = "Whitelist"
-        verbose_name_plural = "Whitelists"
+        verbose_name = "Banishment Whitelist"
+        verbose_name_plural = "Banishments Whitelist"
         db_table = 'whitelists'
 
 

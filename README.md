@@ -4,7 +4,6 @@ Django Banish Plus
 It also supports basic abuse prevention by automatically banning users if they **exceed a certain number of requests per minute**, which is likely some form of attack or attempted *denial of service*.
 
 Django Banish Plus stores all ***banishments*** in memory to avoid database lookups on every request. 
-
 It requires memcached, especially for the IP abuse monitoring feature.
 
 Django Banish Plus is based on [Django Banish](http://github.com/yourabi/django-banish) package by [Yousef Ourabi][1].
@@ -21,27 +20,32 @@ Features
 Installation
 ------------
 
-Requirements:
+### Requirements:
 
 * Python 2.7
 * Django 1.11
 * **Memcache** or **Redis** cache system.
 * Celery
 
-##### Python Packages.
+### Python Packages.
 - celery: 4.1.0
 - redis: 2.10.6
 - django-redis-cache: 1.7.1
 
-##### Clone with Git:
+### Clone with Git:
 > $ git clone git@github.com:josemlp91/django-banish-private.git
     
-##### Install and config cache system, to save all banish ips list.
+    
+### Pip install
+> pip install git+ssh://git@github.com:josemlp91/django-banish-private.git
+
+    
+### Install and config cache system, to save all banish ips list.
 
 - [Link to config **mencached cache system** in Django enviroment](https://djangosteps.wordpress.com/2013/07/03/setup-memcache-for-django-in-a-development-environment/)
 - [Link to config **redis cache system** in Django enviroment](https://realpython.com/blog/python/caching-in-django-with-redis/)
 
-##### Install and config celery asynchronous task manager, to refresh tor ips list database.
+### Install and config celery asynchronous task manager, to refresh tor ips list database.
 
 - [Link to config **redis asynchronous task manager** in Django enviroment](http://docs.celeryproject.org/en/latest/django/first-steps-with-django.html)
 
@@ -55,7 +59,7 @@ In your django project settings.py you must set the following options:
 
 2. Add ``'banish'`` to ``INSTALLED_APPS``
 
-3. Run ``manage.py migrate`` to apply database changes and create news tables.
+3. Run ``manage.py migrate`` to apply database changes and create new tables.
 
 4. Add ``BANISH_ENABLED = True`` to enable Django-Banish (handy if you lock yourself out, you can just set this to False)
     
@@ -92,9 +96,8 @@ See the License for the specific language governing permissions and limitations 
 
 Authors
 -------
- * [José Miguel LP][2]
+ * [José Miguel LP (intelligenia)][2]
  * [Yousef Ourabi][1]
-
 
 [1]: http://github.com/yourabi
 [2]: https://github.com/josemlp91/
