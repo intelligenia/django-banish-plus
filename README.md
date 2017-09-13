@@ -33,11 +33,11 @@ Installation
 - django-redis-cache: 1.7.1
 
 ### Clone with Git:
-> $ git clone git@git.intelligenia.com:21617/josemiguel/django-banish-private.git
+> $ git clone https://github.com/intelligenia/django-banish-plus
     
     
 ### Pip install
-> pip install git+ssh://git@git.intelligenia.com:21617/josemiguel/django-banish-private.git
+> pip install -e  git://github.com/intelligenia/django-banish-plus.git#egg=django-banish-plus
 
     
 ### Install and config cache system, to save all banish ips list.
