@@ -12,28 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License. 
 
+
+import os
+from setuptools import setup, find_packages
+
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
 
-Version = 0.2
-setup ( name='django-banish',
-        version = Version,
-        install_requires='python-memcached',
-        description = "django middleware to ban users, prevent too many concurrent connections",
-        long_description = "django-banish is a django middleware app to banish user agents by IP addresses or User Agent Header. It also supports basic abuse prevention by automatically banning users if they exceed a certain number of requests per minute which is likely some form of attack or attemped denial of service.",
-        author = "Yousef Ourabi",
-        author_email = "yourabi@gmail.com",
-        url = "http://github.com/yourabi/django-banish",
-        packages = ['banish',],
-        license = 'Apache',
-        platforms = 'Posix; MacOS X;',
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
+
+data_files = []
+for dirpath, dirnames, filenames in os.walk('.'):
+    for i, dirname in enumerate(dirnames):
+        if dirname.startswith('.'):
+            del dirnames[i]
+    if '__init__.py' in filenames:
+        continue
+    elif filenames:
+        data_files.append([dirpath, [os.path.join(dirpath, f) for f in filenames]])
+
+
+setup ( name='django-banish-plus',
+        version = "0.1",
+        install_requires=['python-memcached',"celery"],
+        description = "django-banish-plus is a django middleware to ban users, prevent too many concurrent connections and TOR ips request",
+        long_description = long_description,
+        author = "intelligenia S.L.",
+        author_email = "josemiguel@intelligenia.com",
+        url = "https://github.com/josemlp91/django-banish-plus",
+        packages = find_packages('.'),
+        license = 'Apache V2',
+	data_files=data_files,
+	keywords="tor banish security django",
         classifiers = [
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Apache Software License',
             'Topic :: Internet :: WWW/HTTP',
             'Topic :: Software Development :: Libraries :: Application Frameworks',
             'Topic :: Software Development :: Libraries :: Python Modules',
+	    'Development Status :: 5 - Production/Stable',
+            'Framework :: Django',
         ],
      )
