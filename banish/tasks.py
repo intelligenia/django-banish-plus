@@ -1,5 +1,5 @@
 import requests
-import crontab
+from celery.schedules import crontab
 from django.core.cache import cache
 from celery import task
 from django.conf import settings
