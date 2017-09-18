@@ -47,7 +47,7 @@ Installation
 
 ### Install and config celery asynchronous task manager, to refresh tor ips list database.
 
-- [Link to config **redis asynchronous task manager** in Django enviroment](http://docs.celeryproject.org/en/latest/django/first-steps-with-django.html)
+- [Link to config **celery asynchronous task manager** in Django enviroment](http://docs.celeryproject.org/en/latest/django/first-steps-with-django.html)
 
 Setup
 ------
