@@ -3,6 +3,7 @@ from django.core.cache import cache
 from celery import task
 from django.conf import settings
 from .models import Banishment
+from celery.task import periodic_task
 
 # Una vez al mes, limpiamos lista negra.
 @periodic_task(run_every=crontab(day_of_month=1))
