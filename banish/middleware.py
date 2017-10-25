@@ -37,16 +37,19 @@ class BanishMiddleware(object):
         # processes next middleware.
         self.ENABLED = getattr(settings, 'BANISH_ENABLED', False)
         self.DEBUG = getattr(settings, 'BANISH_DEBUG', False)
-        self.ABUSE_THRESHOLD = getattr(settings, 'BANISH_ABUSE_THRESHOLD', 75)
         self.USE_HTTP_X_FORWARDED_FOR = getattr(settings, 'BANISH_USE_HTTP_X_FORWARDED_FOR', False)
         self.BANISH_EMPTY_UA = getattr(settings, 'BANISH_EMPTY_UA', True)
         self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', "You are banned.")
         self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
-        self.BANISH_URI_FILTER = getattr(settings, 'BANISH_URI_FILTER', "/")
         self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
         self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
         self.BANISH_TOR_IPS = getattr(settings, 'BANISH_TOR_IPS', False)
         self.BANISH_ONLY_WHITELIST = getattr(settings, 'BANISH_ONLY_WHITELIST', False)
+
+        # New version
+        self.BANISH_ABUSE_THRESHOLD_TO_URL = getattr(settings, 'BANISH_ABUSE_THRESHOLD_TO_URL', 10000)
+        self.DEFAULT_BANISH_ABUSE_THRESHOLD = getattr(settings, 'DEFAULT_BANISH_ABUSE_THRESHOLD', False)
+
 
         if not self.ENABLED:
             raise MiddlewareNotUsed(
@@ -112,33 +115,40 @@ class BanishMiddleware(object):
 
     def process_request(self, request):
 
+        abuse_threshold = self.DEFAULT_BANISH_ABUSE_THRESHOLD
+        ip = self._get_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', None)
+
         if self.BANISH_RESTRICT_FILTER:
-            if self._get_path(request).find(self.BANISH_URI_FILTER) >= 0:
+            for threshold_to_url in self.BANISH_ABUSE_THRESHOLD_TO_URL:
+                if (self._get_path(request).find(threshold_to_url.get('url')) >= 0):
+                    abuse_threshold = threshold_to_url.get(u'threshold')
+                    url = threshold_to_url.get(u'url')
 
-                ip = self._get_ip(request)
-                user_agent = request.META.get('HTTP_USER_AGENT', None)
+                    print "{0}: {1}".format(url, abuse_threshold)
 
-                if self.DEBUG:
-                    print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
 
-                # Check whitelist first, if not allowed, then check ban conditions
-                if self.is_whitelisted(ip):
-                  return None
-                elif self.is_banned(ip) or \
-                     self.monitor_abuse(ip) or \
-                     self.BANISH_ONLY_WHITELIST or \
-                     user_agent in self.BANNED_AGENTS:
+            if self.DEBUG:
+                print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
 
-                    if self.BANISH_URL_REDIRECT:
-                        return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
-                    elif self.BANISH_TEMPLATRE:
-                        return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
-                    else:
-                        return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+            # Check whitelist first, if not allowed, then check ban conditions
+            if self.is_whitelisted(ip):
+              return None
+            elif self.is_banned(ip) or \
+                 self.monitor_abuse(ip, abuse_threshold) or \
+                 self.BANISH_ONLY_WHITELIST or \
+                 user_agent in self.BANNED_AGENTS:
 
+                if self.BANISH_URL_REDIRECT:
+                    return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
+                elif self.BANISH_TEMPLATRE:
+                    return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
                 else:
-                    if self._is_tor_ip(ip) and self.BANISH_TOR_IPS:
-                        return self.http_response_forbidden("Banish TOR ip", content_type="text/html")
+                    return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+
+            else:
+                if self._is_tor_ip(ip) and self.BANISH_TOR_IPS:
+                    return self.http_response_forbidden("Banish TOR ip", content_type="text/html")
 
 
 
@@ -171,7 +181,7 @@ class BanishMiddleware(object):
             print >> sys.stderr, "BANISH WHITELISTED IP: ", self.WHITELIST_PREFIX + ip
         return is_whitelisted
 
-    def monitor_abuse(self, ip):
+    def monitor_abuse(self, ip, abuse_threshold):
         """
         Track the number of hits per second for a given IP.
         If the count is over ABUSE_THRESHOLD banish user
@@ -187,7 +197,7 @@ class BanishMiddleware(object):
         if not abuse_count:
             cache.set(cache_key, 1, 60)
         else:
-            if abuse_count >= self.ABUSE_THRESHOLD:
+            if abuse_count >= abuse_threshold:
                 over_abuse_limit = True
                 # Store IP Abuse in memcache and database
                 ban = Banishment(

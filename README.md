@@ -65,7 +65,7 @@ In your django project settings.py you must set the following options:
     
 5. ``ADD BANISH_EMPTY_UA = True|False`` to specify wether requests without a USER_AGENT header will be banned.
 
-6. Optionally set ``BANISH_ABUSE_THRESHOLD`` (default is 75) to the threshold of requests per minute
+6. Optionally set ``DEFAULT_BANISH_ABUSE_THRESHOLD`` (default is 100000) to the threshold of requests per minute
 
 7. Optionally set ``BANISH_MESSAGE`` (default is "You are banned.") to change default message for banned user.
 
@@ -75,7 +75,7 @@ In your django project settings.py you must set the following options:
 
 10. Optionally set ``BANISH_RESTRICT_FILTER`` = True|False (default False), to specific url patch where banish is applied.
 
-11. ``BANISH_URI_FILTER`` is patch where banish is applied if  BANISH_RESTRICT_FILTER = True (example ``BANISH_URI_FILTER = '\api'`` only protect \api)
+11. ``BANISH_ABUSE_THRESHOLD_TO_URL`` array whit dict "url path" and  "threshold"
 
 12. Set ``BANISH_ONLY_WHITELIST = True|False``to allow only request from whitelist.
 
@@ -85,6 +85,32 @@ In your django project settings.py you must set the following options:
 
 15. Set ``TOR_CACHE_KEY`` with cache key. (example ``TOR_CACHE_KEY = "tor-ip-exit-list"``)
 
+
+Example
+------
+
+```
+
+BANISH_ENABLED = False
+BANISH_EMPTY_UA = True
+BANISH_RESTRICT_FILTER = True
+
+DEFAULT_BANISH_ABUSE_THRESHOLD = 10000
+BANISH_ABUSE_THRESHOLD_TO_URL = [
+	{u'url': u'/api/v1/',      u'threshold': 100},
+	{u'url': u'/api/v2/', 	 u'threshold': 100},
+	{u'url': u'/api/v3/', u'threshold': 10},
+	{u'url': u'/api/v4/',     u'threshold': 5}
+]
+
+BANISH_TOR_IPS = True
+BANISH_ONLY_WHITELIST = False
+
+TOR_IPS_DATABASE = u"http://torstatus.blutmagie.de/ip_list_exit.php/Tor_ip_list_EXIT.csv"
+TOR_CACHE_KEY = u"tor-ip-exit-list"
+BANISH_MESSAGE = u"{'msg': 'Banish Access'}"
+
+```
 
 License
 ------
