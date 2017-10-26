@@ -7,13 +7,12 @@ from .models import Banishment
 from celery.task import periodic_task
 
 
-# Una vez al mes, limpiamos lista negra.
-@periodic_task(run_every=crontab(day_of_month=1))
-def clean_ip_blacklist():
+@app.task(bind=True)
+def clean_ip_blacklist(self):
     Banishment.objects.all().delete()
 
 # Cada 5 minutos.
-@periodic_task(run_every=crontab(minute='*/5'))
+@app.task(bind=True)
 def update_ip_list():
     """ Background task to update the tor IP list.
     This is periodically configured to be run every 24 h.
