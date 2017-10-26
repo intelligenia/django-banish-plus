@@ -1,10 +1,15 @@
 import requests
-from celery.schedules import crontab
+from celery import Celery
 from django.core.cache import cache
-from celery import task
 from django.conf import settings
 from .models import Banishment
-from celery.task import periodic_task
+
+
+app = Celery('banish')
+
+
+app.config_from_object(settings.CELERY_CONFIG)
+app.autodiscover_tasks(lambda: settings.INSTALLED_APPS, related_name="tasks")
 
 
 @app.task(bind=True)
@@ -13,7 +18,7 @@ def clean_ip_blacklist(self):
 
 # Cada 5 minutos.
 @app.task(bind=True)
-def update_ip_list():
+def update_ip_list(self):
     """ Background task to update the tor IP list.
     This is periodically configured to be run every 24 h.
     Results should be stord for longer period of time.
