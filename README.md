@@ -97,10 +97,10 @@ BANISH_RESTRICT_FILTER = True
 
 DEFAULT_BANISH_ABUSE_THRESHOLD = 10000
 BANISH_ABUSE_THRESHOLD_TO_URL = [
-	{u'url': u'/api/v1/',      u'threshold': 100},
-	{u'url': u'/api/v2/', 	 u'threshold': 100},
-	{u'url': u'/api/v3/', u'threshold': 10},
-	{u'url': u'/api/v4/',     u'threshold': 5}
+	{u'url': u'/api/v1/', u'name':'v1', u'threshold': 100},
+	{u'url': u'/api/v2/', u'name':'v2', u'threshold': 100},
+	{u'url': u'/api/v3/', u'name':'v3', u'threshold': 10},
+	{u'url': u'/api/v4/', u'name':'v4', u'threshold': 5}
 ]
 
 BANISH_TOR_IPS = True

@@ -22,193 +22,202 @@ from django.core.exceptions import MiddlewareNotUsed
 from django.core.cache import cache
 from django.template import loader
 
+# Own model
 from models import Banishment, Whitelist
 
 
-
-
 class BanishMiddleware(object):
-    def __init__(self):
-        """
-        Middleware init is called once per server on startup - do the heavy
-        lifting here.
-        """
-        # If disabled or not enabled raise MiddleWareNotUsed so django
-        # processes next middleware.
-        self.ENABLED = getattr(settings, 'BANISH_ENABLED', False)
-        self.DEBUG = getattr(settings, 'BANISH_DEBUG', False)
-        self.USE_HTTP_X_FORWARDED_FOR = getattr(settings, 'BANISH_USE_HTTP_X_FORWARDED_FOR', False)
-        self.BANISH_EMPTY_UA = getattr(settings, 'BANISH_EMPTY_UA', True)
-        self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', "You are banned.")
-        self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
-        self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
-        self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
-        self.BANISH_TOR_IPS = getattr(settings, 'BANISH_TOR_IPS', False)
-        self.BANISH_ONLY_WHITELIST = getattr(settings, 'BANISH_ONLY_WHITELIST', False)
+	def __init__(self):
+		"""
+		Middleware init is called once per server on startup - do the heavy
+		lifting here.
+		"""
+		# If disabled or not enabled raise MiddleWareNotUsed so django
+		# processes next middleware.
+		self.ENABLED = getattr(settings, 'BANISH_ENABLED', False)
+		self.DEBUG = getattr(settings, 'BANISH_DEBUG', False)
+		self.USE_HTTP_X_FORWARDED_FOR = getattr(settings, 'BANISH_USE_HTTP_X_FORWARDED_FOR', False)
+		self.BANISH_EMPTY_UA = getattr(settings, 'BANISH_EMPTY_UA', True)
+		self.BANISH_MESSAGE = getattr(settings, 'BANISH_MESSAGE', "You are banned.")
+		self.BANISH_RESTRICT_FILTER = getattr(settings, 'BANISH_RESTRICT_FILTER', False)
+		self.BANISH_URL_REDIRECT = getattr(settings, 'BANISH_URL_REDIRECT', None)
+		self.BANISH_TEMPLATRE = getattr(settings, 'BANISH_TEMPLATRE', None)
+		self.BANISH_TOR_IPS = getattr(settings, 'BANISH_TOR_IPS', False)
+		self.BANISH_ONLY_WHITELIST = getattr(settings, 'BANISH_ONLY_WHITELIST', False)
 
-        # New version
-        self.BANISH_ABUSE_THRESHOLD_TO_URL = getattr(settings, 'BANISH_ABUSE_THRESHOLD_TO_URL', 10000)
-        self.DEFAULT_BANISH_ABUSE_THRESHOLD = getattr(settings, 'DEFAULT_BANISH_ABUSE_THRESHOLD', False)
+		# New version
+		self.BANISH_ABUSE_THRESHOLD_TO_URL = getattr(settings, 'BANISH_ABUSE_THRESHOLD_TO_URL', 10000)
+		self.DEFAULT_BANISH_ABUSE_THRESHOLD = getattr(settings, 'DEFAULT_BANISH_ABUSE_THRESHOLD', False)
 
+		if not self.ENABLED:
+			raise MiddlewareNotUsed(
+				"django-banish is not enabled via settings.py")
 
-        if not self.ENABLED:
-            raise MiddlewareNotUsed(
-                "django-banish is not enabled via settings.py")
+		if self.DEBUG:
+			print >> sys.stderr, "[django-banish] status = enabled"
 
-        if self.DEBUG:
-            print >> sys.stderr, "[django-banish] status = enabled"
+		# Prefix All keys in cache to avoid key collisions
+		self.BANISH_PREFIX = 'DJANGO_BANISH:'
+		self.ABUSE_PREFIX = 'DJANGO_BANISH_ABUSE:'
+		self.WHITELIST_PREFIX = 'DJANGO_BANISH_WHITELIST:'
+		self.BANNED_AGENTS = []
 
-        # Prefix All keys in cache to avoid key collisions
-        self.BANISH_PREFIX = 'DJANGO_BANISH:'
-        self.ABUSE_PREFIX = 'DJANGO_BANISH_ABUSE:'
-        self.WHITELIST_PREFIX = 'DJANGO_BANISH_WHITELIST:'
+		if self.BANISH_EMPTY_UA:
+			self.BANNED_AGENTS.append(None)
 
-        self.BANNED_AGENTS = []
+		# Populate various 'banish' buckets
+		for ban in Banishment.objects.all():
+			if self.DEBUG:
+				print >> sys.stderr, "IP BANISHMENT: ", ban.type
 
-        if self.BANISH_EMPTY_UA:
-            self.BANNED_AGENTS.append(None)
+			if ban.type == 'ip-address':
+				cache_key = self.BANISH_PREFIX + ban.condition
+				cache.set(cache_key, "1")
 
-        # Populate various 'banish' buckets
-        for ban in Banishment.objects.all():
-            if self.DEBUG:
-                print >> sys.stderr, "IP BANISHMENT: ", ban.type
+			if ban.type == 'user-agent':
+				self.BANNED_AGENTS.append(ban.condition)
 
-            if ban.type == 'ip-address':
-                cache_key = self.BANISH_PREFIX + ban.condition
-                cache.set(cache_key, "1")
+		for whitelist in Whitelist.objects.all():
+			if whitelist.type == 'ip-address-whitelist':
+				cache_key = self.WHITELIST_PREFIX + whitelist.condition
+				cache.set(cache_key, "1")
 
-            if ban.type == 'user-agent':
-                self.BANNED_AGENTS.append(ban.condition)
- 
-        for whitelist in Whitelist.objects.all():
-            if whitelist.type == 'ip-address-whitelist':
-                cache_key = self.WHITELIST_PREFIX + whitelist.condition
-                cache.set(cache_key, "1")
+	def _get_path(self, request):
+		return request.path
 
-    def _get_path(self, request):
-        return request.path
+	def _get_ip(self, request):
 
-    def _get_ip(self, request):
+		ip = request.META['REMOTE_ADDR']
+		if self.USE_HTTP_X_FORWARDED_FOR or not ip or ip == '127.0.0.1':
+			ip = request.META.get('HTTP_X_FORWARDED_FOR', ip).split(',')[0].strip()
+		return ip
 
-        ip = request.META['REMOTE_ADDR']
-        if self.USE_HTTP_X_FORWARDED_FOR or not ip or ip == '127.0.0.1':
-            ip = request.META.get('HTTP_X_FORWARDED_FOR', ip).split(',')[0].strip()
-        return ip
+	def _is_tor_ip(self, ip):
+		""" Checks if ip address is a TOR exit node.
+		Relies on periodically updated IP list.
+		If IP list update has failed then gracefully assumes
+		there are no Tor exit nodes. This is so that
+		our service continues to function even if the external
+		party we are relying on goes down.
+		:param ip: IP address as a string
+		"""
+		TOR_CACHE_KEY = getattr(settings, 'TOR_CACHE_KEY')
 
-    def _is_tor_ip(self, ip):
-        """ Checks if ip address is a TOR exit node.
-        Relies on periodically updated IP list.
-        If IP list update has failed then gracefully assumes
-        there are no Tor exit nodes. This is so that
-        our service continues to function even if the external
-        party we are relying on goes down.
-        :param ip: IP address as a string
-        """
-        TOR_CACHE_KEY = getattr(settings, 'TOR_CACHE_KEY')
+		ips = cache.get(TOR_CACHE_KEY)
 
-        ips = cache.get(TOR_CACHE_KEY)
+		if not ips:
+			# Tor IP list not available; IP check not active
+			return False
+		return ip in ips
 
-        if not ips:
-            # Tor IP list not available; IP check not active
-            return False
-        return ip in ips
+	def process_request(self, request):
 
-    def process_request(self, request):
+		abuse_threshold = self.DEFAULT_BANISH_ABUSE_THRESHOLD
+		url_name = "all"
 
-        abuse_threshold = self.DEFAULT_BANISH_ABUSE_THRESHOLD
-        ip = self._get_ip(request)
-        user_agent = request.META.get('HTTP_USER_AGENT', None)
+		ip = self._get_ip(request)
+		user_agent = request.META.get('HTTP_USER_AGENT', None)
 
-        if self.BANISH_RESTRICT_FILTER:
-            for threshold_to_url in self.BANISH_ABUSE_THRESHOLD_TO_URL:
-                if (self._get_path(request).find(threshold_to_url.get('url')) >= 0):
-                    abuse_threshold = threshold_to_url.get(u'threshold')
-                    url = threshold_to_url.get(u'url')
+		if self.BANISH_RESTRICT_FILTER:
+			for threshold_to_url in self.BANISH_ABUSE_THRESHOLD_TO_URL:
+				if (self._get_path(request).find(threshold_to_url.get('url')) >= 0):
+					abuse_threshold = threshold_to_url.get(u'threshold')
+					url = threshold_to_url.get(u'url')
+					url_name = threshold_to_url.get(u'name')
 
-                    print "{0}: {1}".format(url, abuse_threshold)
+					if self.DEBUG:
+						print >> sys.stderr, "Request URL in  BANISH_ABUSE_THRESHOLD_TO_URL: %s with %s" % (url, abuse_threshold)
 
+			if self.DEBUG:
+				print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
 
-            if self.DEBUG:
-                print >> sys.stderr, "GOT IP FROM Request: %s and User Agent %s" % (ip, user_agent)
+			# Check whitelist first, if not allowed, then check ban conditions
+			if self.is_whitelisted(ip):
+				return None
+			elif self.is_banned(ip) or \
+				self.monitor_abuse(ip, abuse_threshold, url_name) or \
+				self.BANISH_ONLY_WHITELIST or \
+					user_agent in self.BANNED_AGENTS:
 
-            # Check whitelist first, if not allowed, then check ban conditions
-            if self.is_whitelisted(ip):
-              return None
-            elif self.is_banned(ip) or \
-                 self.monitor_abuse(ip, abuse_threshold) or \
-                 self.BANISH_ONLY_WHITELIST or \
-                 user_agent in self.BANNED_AGENTS:
+				if self.BANISH_URL_REDIRECT:
+					return self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
+				elif self.BANISH_TEMPLATRE:
+					return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
+				else:
+					return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
 
-                if self.BANISH_URL_REDIRECT:
-                    return  self.redirect_response_forbidden(self.BANISH_URL_REDIRECT)
-                elif self.BANISH_TEMPLATRE:
-                    return self.template_response_forbidden(request, self.BANISH_TEMPLATRE)
-                else:
-                    return self.http_response_forbidden(self.BANISH_MESSAGE, content_type="text/html")
+			else:
+				if self._is_tor_ip(ip) and self.BANISH_TOR_IPS:
+					return self.http_response_forbidden("Banish TOR ip", content_type="text/html")
 
-            else:
-                if self._is_tor_ip(ip) and self.BANISH_TOR_IPS:
-                    return self.http_response_forbidden("Banish TOR ip", content_type="text/html")
+	def http_response_forbidden(self, message, content_type):
+		if django.VERSION[:2] > (1, 3):
+			kwargs = {'content_type': content_type}
+		else:
+			kwargs = {'mimetype': content_type}
+		return HttpResponseForbidden(message, **kwargs)
 
+	def redirect_response_forbidden(self, url):
+		return HttpResponseRedirect(url)
 
+	def template_response_forbidden(self, request, template):
+		t = loader.get_template(template)
+		return HttpResponse(t.render({}, request))
 
-    def http_response_forbidden(self, message, content_type):
-        if django.VERSION[:2] > (1,3):
-            kwargs = {'content_type': content_type}
-        else:
-            kwargs = {'mimetype': content_type}
-        return HttpResponseForbidden(message, **kwargs)
+	def is_banned(self, ip):
+		# If a key BANISH MC key exists we know the user is banned.
+		is_banned = cache.get(self.BANISH_PREFIX + ip)
+		if self.DEBUG and is_banned:
+			print >> sys.stderr, "BANISH BANNED IP: ", self.BANISH_PREFIX + ip
+		return is_banned
 
-    def redirect_response_forbidden(self, url):
-        return HttpResponseRedirect(url)
+	def is_whitelisted(self, ip):
+		# If a whitelist key exists, return True to allow the request through
+		is_whitelisted = cache.get(self.WHITELIST_PREFIX + ip)
+		if self.DEBUG and is_whitelisted:
+			print >> sys.stderr, "BANISH WHITELISTED IP: ", self.WHITELIST_PREFIX + ip
+		return is_whitelisted
 
-    def template_response_forbidden(self, request, template):
-        t = loader.get_template(template)
-        return HttpResponse(t.render({}, request))
+	def monitor_abuse(self, ip, abuse_threshold, url_name):
+		"""
+		Track the number of hits per second for a given IP.
+		If the count is over ABUSE_THRESHOLD banish user
+		"""
+		cache_key = self.ABUSE_PREFIX + ip + ":" + url_name
+		abuse_count = cache.get(cache_key)
 
+		if self.DEBUG:
+			print >> sys.stderr, "BANISH ABUSE COUNT: ", abuse_count
+			print >> sys.stderr, "BANISH CACHE KEY: ", cache_key
 
-    def is_banned(self, ip):
-        # If a key BANISH MC key exists we know the user is banned.
-        is_banned = cache.get(self.BANISH_PREFIX + ip)
-        if self.DEBUG and is_banned:
-            print >> sys.stderr, "BANISH BANNED IP: ", self.BANISH_PREFIX + ip
-        return is_banned
+		over_abuse_limit = False
 
-    def is_whitelisted(self, ip):
-        # If a whitelist key exists, return True to allow the request through
-        is_whitelisted = cache.get(self.WHITELIST_PREFIX + ip)
-        if self.DEBUG and is_whitelisted:
-            print >> sys.stderr, "BANISH WHITELISTED IP: ", self.WHITELIST_PREFIX + ip
-        return is_whitelisted
+		if not abuse_count:
+			# Set counter value with expiration time 1 minute
+			cache.set(cache_key, 1, 60)
 
-    def monitor_abuse(self, ip, abuse_threshold):
-        """
-        Track the number of hits per second for a given IP.
-        If the count is over ABUSE_THRESHOLD banish user
-        """
-        cache_key = self.ABUSE_PREFIX + ip
-        abuse_count = cache.get(cache_key)
-        if self.DEBUG:
-            print >> sys.stderr, "BANISH ABUSE COUNT: ", abuse_count
-            print >> sys.stderr, "BANISH CACHE KEY: ", cache_key
+		else:
 
-        over_abuse_limit = False
+			if abuse_count >= abuse_threshold:
+				over_abuse_limit = True
+				# Store IP Abuse in memcache and database
 
-        if not abuse_count:
-            cache.set(cache_key, 1, 60)
-        else:
-            if abuse_count >= abuse_threshold:
-                over_abuse_limit = True
-                # Store IP Abuse in memcache and database
-                ban = Banishment(
-                    ban_reason="IP Abuse limit exceeded",
-                    type="ip-address",
-                    condition=ip,
-                )
-                ban.save()
-                cache.set(self.BANISH_PREFIX + ip, "1")
-            try:
-                cache.incr(cache_key)
-            except ValueError:
-                pass
-        return over_abuse_limit
+				# Chck if exist in database
+				oldbanishment = Banishment.objects.filter(condition=ip + ":" + url_name).exists()
+
+				# If not exist save
+				if not oldbanishment:
+					ban = Banishment(ban_reason="IP Abuse limit exceeded", type="ip-address", condition=ip + ":" + url_name)
+					ban.save()
+
+				# Rewrite banish with infinite time expiration.
+				cache.set(cache_key, "1")
+
+			else:
+				# If no excess abuse count only increment.
+				try:
+					cache.incr(cache_key)
+				except ValueError:
+					pass
+
+		return over_abuse_limit
